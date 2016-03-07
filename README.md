@@ -8,3 +8,8 @@ Bashrc
 
 - Color
 - git current branch
+
+gdb-attach
+----------
+
+Attach gdb to a process by name.

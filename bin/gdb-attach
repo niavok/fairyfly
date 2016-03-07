@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: gdb-attach process_name"
+fi
+
+#ATTACH_PID=$(ps -ef | grep $1 | grep -v "grep" | head -n 1  | tr -s " " | cut  -d " " -f 2)
+ATTACH_PID=$(ps -ef | grep $1 | grep -v "gdb-attach" | grep -v "grep" | head -n 1  | tr -s " " | cut  -d " " -f 2)
+
+if [ -z $ATTACH_PID ]
+    then echo "No pid found." ; exit
+fi
+
+gdb -p $ATTACH_PID -ex cont
