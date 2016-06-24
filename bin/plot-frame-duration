@@ -1,0 +1,6 @@
+#!/bin/bash
+DATA_FILE=/tmp/$1.dat
+rm $DATA_FILE
+avprobe -show_packets $1 | grep -A 5 --line-buffered video | awk -F= 'BEGIN {x=0}; /pts_time/{print x " " $2; x++}' > $DATA_FILE
+
+gnuplot -e "input='$DATA_FILE'" $FAIRYFLY_SHARE/plot-data.gnuplot

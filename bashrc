@@ -5,5 +5,5 @@ PS1='\[\033[31m\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00
 
 BASHRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-
+export FAIRYFLY_SHARE=$BASHRC_DIR/share
 export PATH="$PATH:$BASHRC_DIR/bin"
