@@ -1,0 +1,391 @@
+#!/usr/bin/python3
+
+import cmd
+import math
+import operator
+import re
+from decimal import *
+from enum import Enum
+from pyparsing import Literal,CaselessLiteral,Word,Combine,OneOrMore,Group,Optional,\
+    ZeroOrMore,Forward,nums,alphas,ParseException
+
+
+unit_parser = re.compile("(([0-9]+)(\.[0-9]*)?)([a-zA-Z].*)?")
+sub_unit_parser = re.compile("([a-zA-Z]+)(-?[0-9]+)?")
+"""
+Unit database
+
+
+
+
+Dimentions units
+time , second s
+
+
+
+time
+
+s
+ms
+us
+ns
+frame (depend d'un fps
+fps 30
+
+
+10min30s
+
+
+"""
+
+
+class Dimension(Enum):
+    none = 0
+    time = 1
+    length = 2
+    mass = 3
+    temperature = 4
+
+def get_dimension_str(dimension,scale):
+    if dimension == Dimension.none:
+        if scale == 1:
+            return ""
+    if dimension == Dimension.time:
+        if scale == 1:
+            return "s"
+        if scale == Decimal(1) / Decimal(1000):
+            return "ms"
+        if scale == Decimal(1) / Decimal(1000000):
+            return "us"
+        if scale == Decimal(1) / Decimal(1000000000):
+            return "ns"
+    if dimension == Dimension.length:
+        if scale == Decimal(1000):
+            return "km"
+        if scale == 1:
+            return "m"
+        if scale == Decimal(1) / Decimal(10):
+            return "dm"
+        if scale == Decimal(1) / Decimal(100):
+            return "cm"
+        if scale == Decimal(1) / Decimal(1000):
+            return "mm"
+        if scale == Decimal(1) / Decimal(1000000):
+            return "um"
+        if scale == Decimal(1) / Decimal(1000000):
+            return "nm"
+    if dimension == Dimension.mass:
+        if scale == 1:
+            return "kg"
+    if dimension == Dimension.temperature:
+        if scale == 1:
+            return "°K"
+
+    return "#unknown unit: "+str(dimension)+"x"+str(scale)+"#"
+
+class Unit():
+    def __init__(self):
+        self.dimensions=[]
+        for dimension in Dimension:
+            self.dimensions.append((0,1))
+
+    def set_dimension(self, dimension, power, scale):
+        #print("set_dimension "+str(dimension)+" "+str(power)+" "+str(scale))
+        self.dimensions[dimension.value] = (power, scale)
+        #TODO protect double set same dimension
+
+    def normalize(self):
+        scale_offset = 1
+        for dimension in Dimension:
+            power, scale = self.dimensions[dimension.value]
+            if power != 0:
+                if scale != 1:
+                    scale_offset *= DefaultContext.power(scale, power)
+                    self.dimensions[dimension.value] = (power, 1)
+
+        return scale_offset;
+
+    def __str__(self):
+        none_dim = True
+        string = ""
+        for dimension in Dimension:
+            power, scale = self.dimensions[dimension.value]
+            if power > 0:
+                if not none_dim:
+                    string += "."
+                none_dim = False
+                string += get_dimension_str(dimension, scale) + ("" if power == 1 else str(power))
+        for dimension in Dimension:
+            power, scale = self.dimensions[dimension.value]
+            if power < 0:
+                if not none_dim:
+                    string += "."
+                none_dim = False
+                string += get_dimension_str(dimension, scale) + str(power)
+        return string
+
+def parseSubUnit(sub_unit):
+    if sub_unit == "s":
+        return Dimension.time, Decimal(1)
+    if sub_unit == "ms":
+        return Dimension.time, Decimal(1) / Decimal(1000)
+    if sub_unit == "us":
+        return Dimension.time, Decimal(1) / Decimal(1000000)
+    if sub_unit == "ns":
+        return Dimension.time, Decimal(1) / Decimal(1000000000)
+    if sub_unit == "km":
+        return Dimension.length, Decimal(1000)
+    if sub_unit == "m":
+        return Dimension.length, Decimal(1)
+    if sub_unit == "dm":
+        return Dimension.length, Decimal(1) / Decimal(10)
+    if sub_unit == "cm":
+        return Dimension.length, Decimal(1) / Decimal(100)
+    if sub_unit == "mm":
+        return Dimension.length, Decimal(1) / Decimal(1000)
+    if sub_unit == "um":
+        return Dimension.length, Decimal(1) / Decimal(1000000)
+    if sub_unit == "nm":
+        return Dimension.length, Decimal(1) / Decimal(1000000000)
+
+    #todo register unit
+
+    print("Unknown unit: "+sub_unit)
+    return Dimension.none, Decimal(1)
+
+def parseUnit(string):
+    #print("parse unit "+string)
+    
+    unit = Unit()
+
+    split_string = string.split(".")
+    for sub_unit in split_string:
+        #print("sub_unit "+sub_unit)
+    
+        m = sub_unit_parser.match(sub_unit)
+
+        if m:
+            sub_unit = m.group(1)
+            if m.group(2):
+                power = Decimal(m.group(2))
+            else:
+                power = 1
+            dimension,scale = parseSubUnit(sub_unit)
+            unit.set_dimension(dimension, power, scale)
+
+    return unit;
+
+class DecimalUnit:
+    def __init__(self, value, unit):
+        self.value = value
+        self.unit = unit
+
+    def parse(string):
+        m = unit_parser.match(string)
+        unit = Unit();
+        
+        if m:
+            value = Decimal(m.group(1))
+            if m.group(4):
+                unit = parseUnit(m.group(4))
+            #print(unit)
+        else:
+            print("invalid DecimalUnit string : "+string)
+            value = Decimal(0.0);
+        
+        #print("parse UnitDecimal value: " + str(value) + " for "+string)
+        return DecimalUnit(value, unit).normalize()
+
+    def normalize(self):
+        scale = self.unit.normalize()
+        self.value *=  scale
+        return self
+
+    def add(op1, op2):
+        # TODO check unit
+        return DecimalUnit(op1.value + op2.value, op1.unit)
+
+    def mul(op1, op2):
+        # TODO new unit
+        return DecimalUnit(op1.value * op2.value, op1.unit)
+
+    def __str__(self):
+        return str(self.value).rstrip('0') + str(self.unit)
+
+
+def pushIn( strg, loc, toks ):
+    global conv_unit
+    conv_unit = toks[1]
+def pushFirst( strg, loc, toks ):
+    exprStack.append( toks[0] )
+def pushUMinus( strg, loc, toks ):
+    if toks and toks[0]=='-': 
+        exprStack.append( 'unary -' )
+        #~ exprStack.append( '-1' )
+        #~ exprStack.append( '*' )
+
+
+
+
+bnf = None
+def BNF():
+    """
+    expop   :: '^'
+    multop  :: '*' | '/'
+    addop   :: '+' | '-'
+    integer :: ['+' | '-'] '0'..'9'+
+    atom    :: PI | E | real | fn '(' expr ')' | '(' expr ')'
+    factor  :: atom [ expop factor ]*
+    term    :: factor [ multop factor ]*
+    expr    :: term [ addop term ]*
+    """
+    global bnf
+    if not bnf:
+        point = Literal( "." )
+        e     = CaselessLiteral( "E" )
+        #unit = Combine(Word(alphas, alphas + nums+"-/" ) + Word(" "))
+        #unit = Word(alphas, alphas + nums+"-/" )
+
+        unit = Combine(Word(alphas) + Optional(Word("-"+nums, nums)))
+        units = Combine(unit + ZeroOrMore(point +  unit))
+
+        
+        fnumber = Combine( Word( "+-"+nums, nums ) + 
+                           Optional( point + Optional( Word( nums ) ) ) +
+                           Optional( e + Word( "+-"+nums, nums ) ) )
+        fnumber_unit = Combine( Word( "+-"+nums, nums ) + 
+                           Optional( point + Optional( Word( nums ) ) ) +
+                           Optional( e + Word( "+-"+nums, nums ) ) +
+                           units )
+        ident = Word(alphas, alphas+nums+"_$")
+     
+        plus  = Literal( "+" )
+        minus = Literal( "-" )
+        mult  = Literal( "*" )
+        div   = Literal( "/" )
+        lpar  = Literal( "(" ).suppress()
+        rpar  = Literal( ")" ).suppress()
+        addop  = plus | minus
+        multop = mult | div
+        expop = Literal( "^" )
+        pi    = CaselessLiteral( "PI" )
+        
+        expr = Forward()
+        atom = (Optional("-") + ( pi | e | fnumber_unit | fnumber | ident + lpar + expr + rpar ).setParseAction( pushFirst ) | ( lpar + expr.suppress() + rpar )).setParseAction(pushUMinus) 
+        
+        # by defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...", we get right-to-left exponents, instead of left-to-righ
+        # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
+        factor = Forward()
+        factor << atom + ZeroOrMore( ( expop + factor ).setParseAction( pushFirst ) )
+        
+        term = factor + ZeroOrMore( ( multop + factor ).setParseAction( pushFirst ) )
+        expr << term + ZeroOrMore( ( addop + term ).setParseAction( pushFirst ) )
+
+        conv = Forward()
+        #conv << expr + ZeroOrMore("in "+units).setParseAction( pushIn )
+        units_conv = ("in" + units).setParseAction( pushIn )
+        
+        conv << expr + Optional(units_conv)
+        
+        bnf = conv
+    return bnf
+
+# map operator symbols to corresponding arithmetic operations
+epsilon = 1e-12
+opn = { "+" : DecimalUnit.add,
+        "-" : operator.sub,
+        "*" : DecimalUnit.mul,
+        "/" : operator.truediv,
+        "^" : operator.pow }
+fn  = { "sin" : math.sin,
+        "cos" : math.cos,
+        "tan" : math.tan,
+        "abs" : abs,
+        "trunc" : lambda a: int(a),
+        "round" : round,
+        "sgn" : lambda a: abs(a)>epsilon and cmp(a,0) or 0}
+def evaluateStack( s ):
+    op = s.pop()
+    #print("evaluateStack "+op)
+    
+    if op == 'unary -':
+        return -evaluateStack( s )
+    if op in "+-*/^":
+        op2 = evaluateStack( s )
+        op1 = evaluateStack( s )
+        return opn[op]( op1, op2 )
+    elif op == "PI":
+        return math.pi # 3.1415926535
+    elif op == "E":
+        return math.e  # 2.718281828
+    elif op in fn:
+        return fn[op]( evaluateStack( s ) )
+    elif op[0].isalpha():
+        
+        return 0
+    else:
+        #print("parse decimal "+op)
+        return DecimalUnit.parse(op)
+        #return Decimal( op )
+
+
+class ExpressionResolver:
+
+    def __init__(self):
+        self.result = None
+         
+ 
+    def parse(self, line):
+        #parse line
+        global conv_unit
+        global exprStack
+        
+        conv_unit = ""
+        exprStack = []
+        try:
+            results = BNF().parseString( line , parseAll=True)
+        except ParseException as err:
+            print(err.line)
+            print(" "*(err.column-1) + "^")
+            print (err)
+            return
+        #print(exprStack)
+        #print(conv_unit)
+        self.result = evaluateStack( exprStack[:] )
+    
+        #print(line, "=", val, results, "=>", exprStack)
+        #print(val)
+    def has_result(self):
+        return self.result is not None
+        
+    def get_result(self):
+        return str(self.result) + conv_unit;
+
+
+class Fairycalc(cmd.Cmd):
+    intro = 'Fairyfly calculator. Type help for commands or type an expression.'
+    prompt = '> '
+    resolver = ExpressionResolver()
+
+    def do_greet(self, line):
+        print("hello")
+    
+    def do_EOF(self, line):
+        return True
+
+    def default(self, line):
+        #print("cmd " + line)
+
+        
+        self.resolver.parse(line);
+        if self.resolver.has_result():
+            print(self.resolver.get_result())
+        
+
+     
+
+        
+
+if __name__ == '__main__':
+    Fairycalc().cmdloop()
+
