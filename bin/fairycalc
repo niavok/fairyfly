@@ -175,6 +175,9 @@ def parseUnit(string):
 
     return unit;
 
+def remove_exponent(d):
+    return d.quantize(Decimal(1)) if d == d.to_integral() else d.normalize()
+
 class DecimalUnit:
     def __init__(self, value, unit):
         self.value = value
@@ -210,7 +213,7 @@ class DecimalUnit:
         return DecimalUnit(op1.value * op2.value, op1.unit)
 
     def __str__(self):
-        return str(self.value).rstrip('0') + str(self.unit)
+        return str(remove_exponent(self.value.normalize())) + str(self.unit)
 
 
 def pushIn( strg, loc, toks ):
