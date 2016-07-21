@@ -208,6 +208,10 @@ class DecimalUnit:
         # TODO check unit
         return DecimalUnit(op1.value + op2.value, op1.unit)
 
+    def sub(op1, op2):
+        # TODO check unit
+        return DecimalUnit(op1.value - op2.value, op1.unit)
+
     def mul(op1, op2):
         # TODO new unit
         return DecimalUnit(op1.value * op2.value, op1.unit)
@@ -300,7 +304,7 @@ def BNF():
 # map operator symbols to corresponding arithmetic operations
 epsilon = 1e-12
 opn = { "+" : DecimalUnit.add,
-        "-" : operator.sub,
+        "-" : DecimalUnit.sub,
         "*" : DecimalUnit.mul,
         "/" : DecimalUnit.div,
         "^" : operator.pow }
